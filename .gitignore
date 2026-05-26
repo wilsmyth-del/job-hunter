@@ -1,0 +1,17 @@
+# Secrets
+.env
+
+# Data and logs — user-specific, not for source control
+data/
+logs/
+
+# Python
+venv/
+scraper/venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# OS
+.DS_Store

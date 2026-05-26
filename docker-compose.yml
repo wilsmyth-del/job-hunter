@@ -1,0 +1,31 @@
+services:
+
+  # Job Tracker — web UI, always running
+  tracker:
+    build:
+      context: .
+      dockerfile: tracker/Dockerfile
+    ports:
+      - "5002:5002"
+    volumes:
+      - ./data:/app/data
+      - ./filters:/app/filters
+    env_file: .env
+    restart: unless-stopped
+
+  # Scheduler — owns all cron jobs, runs the scraper on schedule
+  scheduler:
+    build:
+      context: .
+      dockerfile: scheduler/Dockerfile
+    volumes:
+      - ./data:/app/data      # shared database volume
+      - ./filters:/app/filters
+      - ./logs:/app/logs
+    env_file: .env
+    environment:
+      - JOB_TRACKER_URL=http://tracker:5002
+      - TZ=America/Toronto  # Set to your timezone (e.g. America/Vancouver, America/New_York)
+    depends_on:
+      - tracker
+    restart: unless-stopped

@@ -1,0 +1,5 @@
+# Job Hunter — scheduled tasks
+# All times are server local time (America/Vancouver)
+
+# Job scraper — weekdays at 6am
+0 6 * * 1-5 cd /app && python scraper/main.py
