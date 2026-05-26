@@ -35,12 +35,51 @@ Copy `.env.example` to `.env` and fill in your values.
 
 | Variable | Required | Description |
 |---|---|---|
-| `TELEGRAM_TOKEN` | Yes | Telegram bot token from @BotFather |
-| `ALLOWED_CHAT_ID` | Yes | Your Telegram chat ID |
-| `GMAIL_USER` | Yes | Gmail address used to send digests |
-| `GMAIL_APP_PASSWORD` | Yes | Gmail app-specific password (not your account password) |
-| `EMAIL_RECIPIENTS` | Yes | Comma-separated list of email addresses to receive digests |
-| `JSEARCH_API_KEY` | Optional | RapidAPI key for JSearch (aggregates Indeed, ZipRecruiter, etc.) |
+| `JSEARCH_API_KEY` | Optional | RapidAPI key for JSearch — see below |
+| `TELEGRAM_TOKEN` | Optional | Telegram bot token from @BotFather |
+| `ALLOWED_CHAT_ID` | Optional | Your Telegram chat ID |
+| `GMAIL_USER` | Optional | Gmail address used to send digests |
+| `GMAIL_APP_PASSWORD` | Optional | Gmail app-specific password (Settings → Security → App passwords) |
+| `EMAIL_RECIPIENTS` | Optional | Comma-separated list of email addresses to receive digests |
+
+Notifications are optional — the scraper and tracker work without any of them. Skip what you don't need.
+
+---
+
+## Getting a JSearch API Key
+
+JSearch aggregates listings from Indeed, ZipRecruiter, Glassdoor, and others. Without it, the scraper falls back to LinkedIn only.
+
+1. Go to [rapidapi.com](https://rapidapi.com) and create a free account
+2. Search for **JSearch** and subscribe to the free plan — **200 requests/month** at no cost
+3. Copy your RapidAPI key and add it to `.env` as `JSEARCH_API_KEY`
+
+200 requests = 200 daily scraper runs, which is more than enough for a job search. Each search query counts as one request per day, so keep your query list to 5–6 targeted searches.
+
+---
+
+## Notifications
+
+Both notification methods are optional. You can use one, both, or neither.
+
+### Telegram (optional)
+
+Sends your top job matches to a Telegram chat each morning.
+
+1. Open Telegram and message [@BotFather](https://t.me/BotFather)
+2. Send `/newbot` and follow the prompts — you'll get a bot token
+3. Message your new bot, then visit `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates` to find your chat ID
+4. Add both to `.env` as `TELEGRAM_TOKEN` and `ALLOWED_CHAT_ID`
+
+### Email digest (optional)
+
+Sends a daily digest of all scored jobs to one or more email addresses.
+
+1. Use a Gmail account (or create one for job search use)
+2. Enable 2FA, then go to **Settings → Security → App passwords** and generate one
+3. Add to `.env` as `GMAIL_USER`, `GMAIL_APP_PASSWORD`, and `EMAIL_RECIPIENTS`
+
+> Slack support is not currently built in. PRs welcome.
 
 ---
 

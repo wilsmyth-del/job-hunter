@@ -280,6 +280,9 @@ def ingest_to_tracker(job: dict, score: int) -> bool:
 
 
 def send_telegram(text: str) -> None:
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        log.info("Telegram not configured — skipping notification")
+        return
     data = json.dumps({
         "chat_id": TELEGRAM_CHAT_ID,
         "text": text,
