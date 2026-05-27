@@ -6,7 +6,11 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import io
+import requests as req
+from dotenv import load_dotenv
 from flask import Flask, jsonify, request, render_template, abort, Response
+
+load_dotenv(Path(__file__).parent.parent / ".env")
 from db import (
     init_db, get_all_jobs, get_job, create_job, update_job, delete_job,
     get_summary, get_overdue_followups,
@@ -185,15 +189,20 @@ def create_app():
     @app.route("/api/config", methods=["GET"])
     def api_get_config():
         config_path = Path(__file__).parent.parent / "filters" / "scraper_config.json"
+        queries = []
+        linkedin_location = ""
         if config_path.exists():
             try:
                 config = json.loads(config_path.read_text())
                 queries = config.get("search_queries", [])
+                linkedin_location = config.get("linkedin_location", "")
             except Exception:
-                queries = []
-        else:
-            queries = []
-        return jsonify({"search_queries": queries, "run_stats": get_scraper_run_stats()})
+                pass
+        return jsonify({
+            "search_queries": queries,
+            "linkedin_location": linkedin_location,
+            "run_stats": get_scraper_run_stats(),
+        })
 
     @app.route("/api/config", methods=["POST"])
     def api_set_config():
@@ -207,10 +216,46 @@ def create_app():
             if not isinstance(item, str) or not item.strip():
                 abort(400, "each search query must be a non-empty string")
         clean = [item.strip() for item in queries]
+        linkedin_location = ""
+        if isinstance(data.get("linkedin_location"), str):
+            linkedin_location = data["linkedin_location"].strip()
         config_path = Path(__file__).parent.parent / "filters" / "scraper_config.json"
         config_path.parent.mkdir(parents=True, exist_ok=True)
-        config_path.write_text(json.dumps({"search_queries": clean}, indent=2))
-        return jsonify({"ok": True, "search_queries": clean})
+        payload = {"search_queries": clean}
+        if linkedin_location:
+            payload["linkedin_location"] = linkedin_location
+        config_path.write_text(json.dumps(payload, indent=2))
+        return jsonify({"ok": True, "search_queries": clean, "linkedin_location": linkedin_location})
+
+    @app.route("/api/test-jsearch", methods=["POST"])
+    def api_test_jsearch():
+        api_key = os.getenv("JSEARCH_API_KEY", "")
+        if not api_key:
+            return jsonify({"ok": False, "error": "JSEARCH_API_KEY not set in .env"})
+        config_path = Path(__file__).parent.parent / "filters" / "scraper_config.json"
+        test_query = "IT support"
+        if config_path.exists():
+            try:
+                queries = json.loads(config_path.read_text()).get("search_queries", [])
+                if queries:
+                    test_query = queries[0]
+            except Exception:
+                pass
+        try:
+            resp = req.get(
+                "https://jsearch.p.rapidapi.com/search",
+                headers={
+                    "x-rapidapi-key": api_key,
+                    "x-rapidapi-host": "jsearch.p.rapidapi.com",
+                },
+                params={"query": test_query, "num_pages": "1"},
+                timeout=15,
+            )
+            resp.raise_for_status()
+            count = len(resp.json().get("data") or [])
+            return jsonify({"ok": True, "count": count, "query": test_query})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)})
 
     @app.route("/api/scraped/<external_id>/add", methods=["POST"])
     def api_add_scraped_to_tracker(external_id):

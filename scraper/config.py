@@ -1,10 +1,14 @@
 # Search queries — customize these to match your target roles and location.
 # Each query costs 1 JSearch API call per day, so keep the list focused.
 SEARCH_QUERIES = [
-    "IT support specialist OR help desk analyst [Your City]",
-    "desktop support analyst OR service desk analyst [Your City]",
-    "IT manager OR infrastructure manager [Your City]",
+    "IT support specialist OR help desk analyst [Your City, Province/State]",
+    "desktop support analyst OR service desk analyst [Your City, Province/State]",
+    "IT manager OR infrastructure manager [Your City, Province/State]",
 ]
+
+# Location passed to the LinkedIn guest API — set to your city and region.
+# Example: "Vancouver, BC" or "Toronto, ON" or "Seattle, WA"
+LINKEDIN_LOCATION = "Your City, Province/State"
 
 # Keyword scoring — matched against job title + description.
 # Add terms from your target roles and resume. Higher score = more relevant.

@@ -34,11 +34,24 @@
     <div class="settings-section">
       <h2>Search Queries</h2>
       <p class="settings-hint">The scraper uses these queries to find jobs. Maximum 8.</p>
+      <details class="settings-tip">
+        <summary>Query format tips</summary>
+        <p>Use <code>OR</code> to combine related titles:<br>
+           <code>help desk OR service desk Vancouver, BC</code></p>
+        <p>Add your city and region to keep results local:<br>
+           <code>IT support specialist Toronto, ON</code></p>
+        <p>Format: <strong>role title City, Province/State</strong></p>
+      </details>
       <div id="query-list"></div>
       <div class="settings-query-meta">
         <span id="query-count">0 of 8 queries</span>
         <button class="btn-secondary" id="add-query-btn" onclick="addQueryInput()">+ Add query</button>
       </div>
+
+      <h3 class="settings-subhead">LinkedIn Location</h3>
+      <p class="settings-hint">City and region for the LinkedIn job search. Example: <code>Vancouver, BC</code> or <code>Seattle, WA</code></p>
+      <input type="text" id="linkedin-location-input" class="query-input settings-location-input" placeholder="e.g. Vancouver, BC">
+
       <div class="settings-save-row">
         <button class="btn-primary" onclick="saveConfig()">Save</button>
         <span id="settings-save-status"></span>
@@ -52,7 +65,11 @@
         <div class="api-usage-bar-wrap">
           <div class="api-usage-bar" id="api-usage-bar" style="width:0%"></div>
         </div>
-        <p class="settings-hint">Scraper runs weekdays at 06:00</p>
+        <p class="settings-hint">JSearch free tier: 200 calls/month. Scraper runs weekdays at 06:00.</p>
+      </div>
+      <div class="settings-test-row">
+        <button class="btn-secondary" onclick="testJSearch()">Test JSearch API</button>
+        <span id="jsearch-test-status"></span>
       </div>
     </div>
   </div>
@@ -254,6 +271,9 @@ function populateSettings(data) {
   queries.forEach(function(q) { addQueryInput(q); });
   updateQueryCount();
 
+  var locationInput = document.getElementById('linkedin-location-input');
+  if (locationInput) locationInput.value = data.linkedin_location || '';
+
   var stats = data.run_stats || {};
   var calls = stats.calls_this_month || 0;
   var limit = 200;
@@ -284,10 +304,13 @@ function saveConfig() {
   statusEl.textContent = 'Saving…';
   statusEl.className = '';
 
+  var locationInput = document.getElementById('linkedin-location-input');
+  var linkedin_location = locationInput ? locationInput.value.trim() : '';
+
   fetch('/api/config', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({search_queries: queries})
+    body: JSON.stringify({search_queries: queries, linkedin_location: linkedin_location})
   })
   .then(function(r) {
     return r.json().then(function(body) { return {ok: r.ok, body: body}; });
@@ -306,6 +329,27 @@ function saveConfig() {
     statusEl.textContent = 'Error: ' + err.message;
     statusEl.className = 'settings-status-err';
   });
+}
+
+function testJSearch() {
+  var statusEl = document.getElementById('jsearch-test-status');
+  statusEl.textContent = 'Testing…';
+  statusEl.className = '';
+  fetch('/api/test-jsearch', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        statusEl.textContent = '✓ ' + data.count + ' results for "' + data.query + '"';
+        statusEl.className = 'settings-status-ok';
+      } else {
+        statusEl.textContent = '✗ ' + (data.error || 'Request failed');
+        statusEl.className = 'settings-status-err';
+      }
+    })
+    .catch(function(err) {
+      statusEl.textContent = '✗ ' + err.message;
+      statusEl.className = 'settings-status-err';
+    });
 }
 
 // ── Tab switching — extend existing pattern ───────────────────────────────────
@@ -413,6 +457,44 @@ function saveConfig() {
   background: var(--accent, #3b82f6);
   height: 100%;
   transition: width 0.3s ease;
+}
+.settings-subhead {
+  margin: 20px 0 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-top: 1px solid var(--border, #e0e0e0);
+  padding-top: 16px;
+}
+.settings-location-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.settings-test-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+.settings-tip {
+  margin: 0 0 14px;
+  font-size: 0.82rem;
+  color: var(--text-muted, #888);
+  cursor: pointer;
+}
+.settings-tip summary {
+  font-weight: 500;
+  user-select: none;
+}
+.settings-tip p {
+  margin: 6px 0 0 12px;
+  line-height: 1.6;
+}
+.settings-tip code {
+  background: var(--surface-2, rgba(0,0,0,0.08));
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-family: monospace;
+  font-size: 0.85em;
 }
 </style>
 </body>

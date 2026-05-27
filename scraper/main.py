@@ -25,6 +25,7 @@ from config import (
     BLOCKED_DOMAINS,
     BLOCKED_SOURCES,
     KEYWORDS,
+    LINKEDIN_LOCATION,
     LOCATION_SCORES,
     MAX_JOBS_PER_NOTIFICATION,
     MIN_KEYWORD_SCORE,
@@ -345,9 +346,10 @@ def send_email(scored_top: list, new_count: int, auto_added: int) -> None:
 def main():
     init_db()
 
-    # Load search queries from JSON config; fall back to config.py if missing or invalid
+    # Load search queries and LinkedIn location from JSON config; fall back to config.py
     _config_path = Path(__file__).parent.parent / "filters" / "scraper_config.json"
     active_queries = SEARCH_QUERIES
+    active_linkedin_location = LINKEDIN_LOCATION
     if _config_path.exists():
         try:
             _cfg = json.loads(_config_path.read_text())
@@ -357,6 +359,10 @@ def main():
                 log.info("Loaded %d queries from scraper_config.json", len(active_queries))
             else:
                 log.warning("scraper_config.json has no valid search_queries — using config.py fallback")
+            _loc = _cfg.get("linkedin_location", "").strip()
+            if _loc:
+                active_linkedin_location = _loc
+                log.info("Loaded LinkedIn location from scraper_config.json: %s", _loc)
         except Exception as _e:
             log.warning("Could not parse scraper_config.json (%s) — using config.py fallback", _e)
     else:
@@ -373,7 +379,7 @@ def main():
     blocked_count = 0
     title_blocked_count = 0
     for query in active_queries:
-        for job in fetch_linkedin(query) + fetch_jsearch(query):
+        for job in fetch_linkedin(query, active_linkedin_location) + fetch_jsearch(query):
             if job["url"] in seen_urls:
                 continue
             if is_blocked(job):
