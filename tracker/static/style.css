@@ -352,6 +352,10 @@ textarea { resize: vertical; }
 }
 
 #sources-view.hidden { display: none; }
+#settings-view {
+  flex: 1;
+  overflow-y: auto;
+}
 #settings-view.hidden { display: none; }
 #main.hidden { display: none; }
 

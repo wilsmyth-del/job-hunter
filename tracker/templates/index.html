@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Job Tracker</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=2">
 </head>
 <body>
 
@@ -81,6 +81,15 @@
       <div class="settings-test-row" style="margin-top:8px">
         <button class="btn-secondary" onclick="testLinkedIn()">Test LinkedIn</button>
         <span id="linkedin-test-status"></span>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h2>Run Scraper</h2>
+      <p class="settings-hint">Trigger an immediate scrape. Your scheduled daily run at 06:00 on weekdays is unaffected.</p>
+      <div class="settings-test-row">
+        <button class="btn-primary" id="run-now-btn" onclick="runScraperNow()">Run Now</button>
+        <span id="run-now-status"></span>
       </div>
     </div>
 
@@ -244,7 +253,7 @@
   </div>
 </div>
 
-<script src="/static/app.js"></script>
+<script src="/static/app.js?v=2"></script>
 <script>
 // ── Settings tab ──────────────────────────────────────────────────────────────
 
@@ -407,6 +416,50 @@ function _runTest(url, statusId) {
 
 function testJSearch()  { _runTest('/api/test-jsearch',  'jsearch-test-status'); }
 function testLinkedIn() { _runTest('/api/test-linkedin', 'linkedin-test-status'); }
+
+var _scraperPollTimer = null;
+
+function runScraperNow() {
+  var btn = document.getElementById('run-now-btn');
+  var status = document.getElementById('run-now-status');
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+  status.textContent = '';
+  status.className = '';
+  fetch('/api/run-scraper', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) {
+        btn.textContent = 'Running…';
+        status.textContent = 'Scraper started — check Sources in a few minutes.';
+        status.className = 'settings-status-ok';
+        _scraperPollTimer = setInterval(function() {
+          fetch('/api/scraper-status')
+            .then(function(r) { return r.json(); })
+            .then(function(s) {
+              if (!s.running) {
+                clearInterval(_scraperPollTimer);
+                btn.disabled = false;
+                btn.textContent = 'Run Now';
+                status.textContent = 'Done — refresh Sources to see new listings.';
+              }
+            })
+            .catch(function() { clearInterval(_scraperPollTimer); btn.disabled = false; btn.textContent = 'Run Now'; });
+        }, 5000);
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Run Now';
+        status.textContent = '✗ ' + (d.error || 'Failed to start');
+        status.className = 'settings-status-err';
+      }
+    })
+    .catch(function(e) {
+      btn.disabled = false;
+      btn.textContent = 'Run Now';
+      status.textContent = '✗ ' + e.message;
+      status.className = 'settings-status-err';
+    });
+}
 
 // ── Tab switching — extend existing pattern ───────────────────────────────────
 

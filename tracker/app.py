@@ -1,6 +1,9 @@
 import csv
 import json
 import os
+import subprocess
+import sys
+import threading
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
@@ -308,6 +311,47 @@ def create_app():
         })
         mark_scraped_added(external_id, job["id"])
         return jsonify({"ok": True, "tracker_id": job["id"]})
+
+    _SCRAPER_LOCK = Path(__file__).parent.parent / "data" / "scraper.lock"
+
+    def _scraper_cleanup(proc):
+        proc.wait()
+        try:
+            _SCRAPER_LOCK.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    @app.route("/api/run-scraper", methods=["POST"])
+    def api_run_scraper():
+        if _SCRAPER_LOCK.exists():
+            try:
+                pid = int(_SCRAPER_LOCK.read_text().strip())
+                os.kill(pid, 0)
+                return jsonify({"ok": False, "error": "Scraper is already running"})
+            except (OSError, ValueError):
+                _SCRAPER_LOCK.unlink(missing_ok=True)
+        scraper_path = Path(__file__).parent.parent / "scraper" / "main.py"
+        proc = subprocess.Popen(
+            [sys.executable, str(scraper_path)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            cwd=str(scraper_path.parent),
+        )
+        _SCRAPER_LOCK.write_text(str(proc.pid))
+        threading.Thread(target=_scraper_cleanup, args=(proc,), daemon=True).start()
+        return jsonify({"ok": True, "started": True})
+
+    @app.route("/api/scraper-status", methods=["GET"])
+    def api_scraper_status():
+        if not _SCRAPER_LOCK.exists():
+            return jsonify({"running": False})
+        try:
+            pid = int(_SCRAPER_LOCK.read_text().strip())
+            os.kill(pid, 0)
+            return jsonify({"running": True})
+        except (OSError, ValueError):
+            _SCRAPER_LOCK.unlink(missing_ok=True)
+            return jsonify({"running": False})
 
     return app
 
