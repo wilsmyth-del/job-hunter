@@ -1,6 +1,6 @@
 # job-hunter
 
-Self-hostable job hunting toolkit. Scrapes listings, scores them, filters the noise, tracks your pipeline.
+Self-hostable job hunting toolkit. Scrapes listings, filters the noise, and tracks your pipeline.
 
 ---
 
@@ -52,7 +52,7 @@ JSearch aggregates listings from Indeed, ZipRecruiter, Glassdoor, and others. Wi
 
 1. Go to [rapidapi.com](https://rapidapi.com) and create a free account
 2. Search for **JSearch** and subscribe to the free plan — **200 requests/month** at no cost
-3. Copy your RapidAPI key and add it to `.env` as `JSEARCH_API_KEY`
+3. Copy your RapidAPI key — paste it into the **Settings tab** in the tracker, or add it to `.env` as `JSEARCH_API_KEY`
 
 200 requests = 200 daily scraper runs, which is more than enough for a job search. Each search query counts as one request per day, so keep your query list to 5–6 targeted searches.
 
@@ -92,49 +92,44 @@ Sends a daily digest of all scored jobs to one or more email addresses.
 scraper/main.py
   ├── fetch_linkedin()    — LinkedIn guest API
   ├── fetch_jsearch()     — JSearch / RapidAPI
-  ├── score_job()         — keyword + location scoring
   ├── filter_job()        — negative keywords + dismissed roles
   ├── ingest_to_tracker() — POST to tracker API
   ├── send_telegram()     — top N results to Telegram
-  └── send_email()        — all scored results to email list
+  └── send_email()        — daily digest to email list
 
 [always running]
      │
      ▼
 tracker/app.py  →  http://localhost:5002
   ├── Pipeline tab   — Watchlist → Applied → Interview → Offer
-  └── Sources tab    — Review scraped jobs, add to pipeline, dismiss irrelevant
+  ├── Sources tab    — Review scraped jobs, add to pipeline, dismiss irrelevant
+  └── Settings tab   — Configure queries, API key, run scraper on demand
 ```
 
 ---
 
 ## Tuning Your Search
 
-### Search Queries (`scraper/config.py`)
+### Search Queries
 
-Edit `SEARCH_QUERIES` to match your target roles and location:
+The easiest way to configure queries is through the **Settings tab** in the tracker UI — no file editing needed. You can set your search terms, LinkedIn location, and JSearch API key there, and trigger a manual run with the **Run Now** button.
+
+Alternatively, edit `scraper/config.py` directly:
 
 ```python
 SEARCH_QUERIES = [
     "IT support technician [Your City]",
     "help desk [Your City]",
 ]
+LINKEDIN_LOCATION = "Your City, Province/State"
 ```
 
-Keep queries targeted. Each query = 1 JSearch API request per day.
-
-### Keyword Scoring (`scraper/config.py`)
-
-`KEYWORDS` — role titles and skills from your background, with weights (higher = more relevant).
-`LOCATION_SCORES` — locations weighted by commute preference.
-`AUTO_ADD_THRESHOLD` — jobs scoring above this are auto-added to your Watchlist.
+Keep queries targeted. Each query = 1 JSearch API request per day (free tier: 200/month).
 
 ### Filtering (`filters/`)
 
 `negative_keywords.json` — list of terms that disqualify a job (e.g. "accountant", "physician").
 `dismissed_roles.json` — populated automatically when you dismiss jobs in the Sources tab.
-
-Positive keyword override: if a job matches a negative keyword but *also* matches a keyword in your `KEYWORDS` list, it passes through and is flagged for manual review. Tie goes to the runner.
 
 ---
 
