@@ -59,6 +59,32 @@
     </div>
 
     <div class="settings-section">
+      <h2>JSearch API Key</h2>
+      <p class="settings-hint">Aggregates listings from Indeed, Glassdoor, and more. Free at <a href="https://rapidapi.com" target="_blank">rapidapi.com</a> — 200 requests/month.</p>
+      <div class="settings-key-row">
+        <input type="password" id="jsearch-key-input" class="query-input settings-location-input" placeholder="Paste your RapidAPI key here">
+        <span id="jsearch-key-status"></span>
+      </div>
+      <div class="settings-save-row">
+        <button class="btn-primary" onclick="saveApiKey()">Save Key</button>
+        <span id="jsearch-key-save-status"></span>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h2>Connection Tests</h2>
+      <p class="settings-hint">Verify your setup is working before the next scheduled scrape.</p>
+      <div class="settings-test-row">
+        <button class="btn-secondary" onclick="testJSearch()">Test JSearch</button>
+        <span id="jsearch-test-status"></span>
+      </div>
+      <div class="settings-test-row" style="margin-top:8px">
+        <button class="btn-secondary" onclick="testLinkedIn()">Test LinkedIn</button>
+        <span id="linkedin-test-status"></span>
+      </div>
+    </div>
+
+    <div class="settings-section">
       <h2>API Usage</h2>
       <div id="api-usage-display">
         <p id="api-usage-text">Loading…</p>
@@ -66,10 +92,6 @@
           <div class="api-usage-bar" id="api-usage-bar" style="width:0%"></div>
         </div>
         <p class="settings-hint">JSearch free tier: 200 calls/month. Scraper runs weekdays at 06:00.</p>
-      </div>
-      <div class="settings-test-row">
-        <button class="btn-secondary" onclick="testJSearch()">Test JSearch API</button>
-        <span id="jsearch-test-status"></span>
       </div>
     </div>
   </div>
@@ -273,6 +295,12 @@ function populateSettings(data) {
   var locationInput = document.getElementById('linkedin-location-input');
   if (locationInput) locationInput.value = data.linkedin_location || '';
 
+  var keyStatus = document.getElementById('jsearch-key-status');
+  if (keyStatus) {
+    keyStatus.textContent = data.jsearch_key_set ? 'Key is set ✓' : 'Not configured';
+    keyStatus.className = data.jsearch_key_set ? 'settings-status-ok' : 'settings-status-err';
+  }
+
   var stats = data.run_stats || {};
   var calls = stats.calls_this_month || 0;
   var limit = 200;
@@ -330,26 +358,55 @@ function saveConfig() {
   });
 }
 
-function testJSearch() {
-  var statusEl = document.getElementById('jsearch-test-status');
+function saveApiKey() {
+  var key = document.getElementById('jsearch-key-input').value.trim();
+  var statusEl = document.getElementById('jsearch-key-save-status');
+  if (!key) { statusEl.textContent = 'Enter a key first'; statusEl.className = 'settings-status-err'; return; }
+  statusEl.textContent = 'Saving…';
+  statusEl.className = '';
+  fetch('/api/config/apikey', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({jsearch_api_key: key})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.ok) {
+      statusEl.textContent = 'Saved ✓';
+      statusEl.className = 'settings-status-ok';
+      document.getElementById('jsearch-key-input').value = '';
+      document.getElementById('jsearch-key-status').textContent = 'Key is set ✓';
+      document.getElementById('jsearch-key-status').className = 'settings-status-ok';
+      setTimeout(function() { statusEl.textContent = ''; }, 3000);
+    } else {
+      statusEl.textContent = 'Error: ' + (data.error || 'Unknown');
+      statusEl.className = 'settings-status-err';
+    }
+  })
+  .catch(function(err) { statusEl.textContent = '✗ ' + err.message; statusEl.className = 'settings-status-err'; });
+}
+
+function _runTest(url, statusId) {
+  var statusEl = document.getElementById(statusId);
   statusEl.textContent = 'Testing…';
   statusEl.className = '';
-  fetch('/api/test-jsearch', { method: 'POST' })
+  fetch(url, { method: 'POST' })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.ok) {
-        statusEl.textContent = '✓ ' + data.count + ' results for "' + data.query + '"';
+        var loc = data.location ? ' (' + data.location + ')' : '';
+        statusEl.textContent = '✓ ' + data.count + ' results' + loc;
         statusEl.className = 'settings-status-ok';
       } else {
         statusEl.textContent = '✗ ' + (data.error || 'Request failed');
         statusEl.className = 'settings-status-err';
       }
     })
-    .catch(function(err) {
-      statusEl.textContent = '✗ ' + err.message;
-      statusEl.className = 'settings-status-err';
-    });
+    .catch(function(err) { statusEl.textContent = '✗ ' + err.message; statusEl.className = 'settings-status-err'; });
 }
+
+function testJSearch()  { _runTest('/api/test-jsearch',  'jsearch-test-status'); }
+function testLinkedIn() { _runTest('/api/test-linkedin', 'linkedin-test-status'); }
 
 // ── Tab switching — extend existing pattern ───────────────────────────────────
 
@@ -473,6 +530,12 @@ function testJSearch() {
   align-items: center;
   gap: 12px;
   margin-top: 12px;
+}
+.settings-key-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
 }
 .settings-tip {
   margin: 0 0 14px;

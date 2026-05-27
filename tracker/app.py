@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 
 import io
 import requests as req
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key as _dotenv_set_key
 from flask import Flask, jsonify, request, render_template, abort, Response
 
 load_dotenv(Path(__file__).parent.parent / ".env")
@@ -185,9 +185,11 @@ def create_app():
                 linkedin_location = config.get("linkedin_location", "")
             except Exception:
                 pass
+        api_key = os.getenv("JSEARCH_API_KEY", "")
         return jsonify({
             "search_queries": queries,
             "linkedin_location": linkedin_location,
+            "jsearch_key_set": bool(api_key),
             "run_stats": get_scraper_run_stats(),
         })
 
@@ -213,6 +215,19 @@ def create_app():
             payload["linkedin_location"] = linkedin_location
         config_path.write_text(json.dumps(payload, indent=2))
         return jsonify({"ok": True, "search_queries": clean, "linkedin_location": linkedin_location})
+
+    @app.route("/api/config/apikey", methods=["POST"])
+    def api_set_apikey():
+        data = request.get_json()
+        key = (data or {}).get("jsearch_api_key", "").strip()
+        if not key:
+            abort(400, "jsearch_api_key is required")
+        env_path = Path(__file__).parent.parent / ".env"
+        if not env_path.exists():
+            env_path.write_text("")
+        _dotenv_set_key(str(env_path), "JSEARCH_API_KEY", key)
+        os.environ["JSEARCH_API_KEY"] = key
+        return jsonify({"ok": True})
 
     @app.route("/api/test-jsearch", methods=["POST"])
     def api_test_jsearch():
@@ -241,6 +256,38 @@ def create_app():
             resp.raise_for_status()
             count = len(resp.json().get("data") or [])
             return jsonify({"ok": True, "count": count, "query": test_query})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)})
+
+    @app.route("/api/test-linkedin", methods=["POST"])
+    def api_test_linkedin():
+        import urllib.request as _ur, urllib.parse as _up, re as _re
+        config_path = Path(__file__).parent.parent / "filters" / "scraper_config.json"
+        cfg = {}
+        if config_path.exists():
+            try:
+                cfg = json.loads(config_path.read_text())
+            except Exception:
+                pass
+        queries = cfg.get("search_queries", [])
+        location = cfg.get("linkedin_location", "")
+        test_query = queries[0] if queries else "IT support"
+        params = _up.urlencode({"keywords": test_query, "location": location, "start": "0"})
+        url = f"https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?{params}"
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/121.0.0.0 Safari/537.36"
+            ),
+            "Accept-Language": "en-CA,en;q=0.9",
+        }
+        try:
+            r = _ur.Request(url, headers=headers)
+            with _ur.urlopen(r, timeout=15) as resp:
+                html = resp.read().decode("utf-8", errors="ignore")
+            cards = _re.findall(r'data-entity-urn="urn:li:jobPosting:(\d+)"', html)
+            return jsonify({"ok": True, "count": len(cards), "query": test_query, "location": location})
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)})
 
