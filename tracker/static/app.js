@@ -272,16 +272,11 @@ function sortedSources() {
 }
 
 function updateSortHeaders() {
-  const fields = ['role', 'company', 'scraped_at'];
-  fields.forEach(f => {
+  const labels = { role: 'Role', company: 'Company', location: 'Location', source: 'Source', scraped_at: 'Found' };
+  Object.entries(labels).forEach(([f, label]) => {
     const th = document.getElementById(`sort-th-${f}`);
     if (!th) return;
-    const label = { role: 'Role', company: 'Company', scraped_at: 'Found' }[f];
-    if (f === sourcesSortField) {
-      th.textContent = label + (sourcesSortDir === 'asc' ? ' ↑' : ' ↓');
-    } else {
-      th.textContent = label;
-    }
+    th.textContent = f === sourcesSortField ? label + (sourcesSortDir === 'asc' ? ' ↑' : ' ↓') : label;
   });
 }
 

@@ -184,7 +184,7 @@ def get_scraped_job(external_id):
 
 
 def get_scraped_jobs(order_by="scraped_at", order_dir="desc"):
-    _COLS = {"company", "role", "scraped_at"}
+    _COLS = {"company", "role", "location", "source", "scraped_at"}
     if order_by not in _COLS:
         order_by = "scraped_at"
     if order_dir not in ("asc", "desc"):

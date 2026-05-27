@@ -76,7 +76,7 @@
 
   <div id="sources-view" class="hidden">
     <div class="sources-toolbar">
-      <button class="btn-secondary" onclick="exportSources()">Export CSV → Z:\</button>
+      <button class="btn-secondary" onclick="exportSources()">Export CSV</button>
       <span id="export-status" class="export-status"></span>
     </div>
     <table id="sources-table">
@@ -84,8 +84,8 @@
         <tr>
           <th id="sort-th-role" class="sortable" onclick="setSortSources('role')">Role</th>
           <th id="sort-th-company" class="sortable" onclick="setSortSources('company')">Company</th>
-          <th>Location</th>
-          <th>Source</th>
+          <th id="sort-th-location" class="sortable" onclick="setSortSources('location')">Location</th>
+          <th id="sort-th-source" class="sortable" onclick="setSortSources('source')">Source</th>
           <th id="sort-th-scraped_at" class="sortable" onclick="setSortSources('scraped_at')">Found</th>
           <th></th>
         </tr>

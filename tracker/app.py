@@ -80,7 +80,7 @@ def create_app():
 
     @app.route("/api/scraped", methods=["GET"])
     def api_list_scraped():
-        _SCRAPED_COLS = {"company", "role", "scraped_at"}
+        _SCRAPED_COLS = {"company", "role", "location", "source", "scraped_at"}
         sort_col = request.args.get("sort", "scraped_at")
         sort_dir = request.args.get("dir", "desc").lower()
         if sort_col not in _SCRAPED_COLS:
