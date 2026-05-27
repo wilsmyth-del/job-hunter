@@ -28,7 +28,6 @@ CREATE TABLE IF NOT EXISTS scraped_jobs (
     location    TEXT,
     url         TEXT,
     source      TEXT,
-    score       INTEGER NOT NULL DEFAULT 0,
     scraped_at  TEXT NOT NULL,
     tracker_id  INTEGER
 );
@@ -164,13 +163,13 @@ def upsert_scraped_job(data):
     with get_conn() as conn:
         conn.execute(
             """INSERT OR IGNORE INTO scraped_jobs
-               (external_id, role, company, location, url, source, score, scraped_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+               (external_id, role, company, location, url, source, scraped_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (
                 data["external_id"], data["role"],
                 data.get("company", ""), data.get("location", ""),
                 data.get("url", ""), data.get("source", ""),
-                int(data.get("score", 0)), now,
+                now,
             ),
         )
     return get_scraped_job(data["external_id"])
@@ -184,10 +183,10 @@ def get_scraped_job(external_id):
     return _row_to_dict(row)
 
 
-def get_scraped_jobs(order_by="score", order_dir="desc"):
-    _COLS = {"score", "company", "role", "scraped_at"}
+def get_scraped_jobs(order_by="scraped_at", order_dir="desc"):
+    _COLS = {"company", "role", "scraped_at"}
     if order_by not in _COLS:
-        order_by = "score"
+        order_by = "scraped_at"
     if order_dir not in ("asc", "desc"):
         order_dir = "desc"
     with get_conn() as conn:

@@ -3,7 +3,7 @@ let currentFilter = 'all';
 let selectedJobId = null;
 let currentView = 'tracker';
 let scrapedJobs = [];
-let sourcesSortField = 'score';
+let sourcesSortField = 'scraped_at';
 let sourcesSortDir = 'desc';
 let pipelineSortField = 'date_updated';
 let pipelineSortDir = 'desc';
@@ -262,7 +262,7 @@ function setSortSources(field) {
     sourcesSortDir = sourcesSortDir === 'asc' ? 'desc' : 'asc';
   } else {
     sourcesSortField = field;
-    sourcesSortDir = field === 'score' || field === 'scraped_at' ? 'desc' : 'asc';
+    sourcesSortDir = field === 'scraped_at' ? 'desc' : 'asc';
   }
   loadSources();
 }
@@ -272,11 +272,11 @@ function sortedSources() {
 }
 
 function updateSortHeaders() {
-  const fields = ['score', 'role', 'company', 'scraped_at'];
+  const fields = ['role', 'company', 'scraped_at'];
   fields.forEach(f => {
     const th = document.getElementById(`sort-th-${f}`);
     if (!th) return;
-    const label = { score: 'Score', role: 'Role', company: 'Company', scraped_at: 'Found' }[f];
+    const label = { role: 'Role', company: 'Company', scraped_at: 'Found' }[f];
     if (f === sourcesSortField) {
       th.textContent = label + (sourcesSortDir === 'asc' ? ' ↑' : ' ↓');
     } else {
@@ -299,7 +299,6 @@ function renderSources() {
   empty.style.display = 'none';
 
   tbody.innerHTML = sortedSources().map(job => {
-    const scoreClass = job.score >= 50 ? 'score-hot' : job.score >= 30 ? 'score-good' : 'score-ok';
     const actionBtn = job.tracker_id
       ? `<span class="btn-added">Added</span>`
       : `<button class="btn-add" onclick="addToTracker('${esc(job.external_id)}')">+ Add</button>`;
@@ -308,7 +307,6 @@ function renderSources() {
       ? `<a href="${esc(job.url)}" target="_blank" class="btn-secondary" style="padding:4px 10px;font-size:12px">↗</a>`
       : '';
     return `<tr>
-      <td><span class="score-badge ${scoreClass}">${job.score}</span></td>
       <td><span class="company-name">${esc(job.role)}</span></td>
       <td><span class="role-name">${esc(job.company || '—')}</span></td>
       <td><span class="date-text">${esc(job.location || '—')}</span></td>

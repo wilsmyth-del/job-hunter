@@ -80,11 +80,11 @@ def create_app():
 
     @app.route("/api/scraped", methods=["GET"])
     def api_list_scraped():
-        _SCRAPED_COLS = {"score", "company", "role", "scraped_at"}
-        sort_col = request.args.get("sort", "score")
+        _SCRAPED_COLS = {"company", "role", "scraped_at"}
+        sort_col = request.args.get("sort", "scraped_at")
         sort_dir = request.args.get("dir", "desc").lower()
         if sort_col not in _SCRAPED_COLS:
-            sort_col = "score"
+            sort_col = "scraped_at"
         if sort_dir not in ("asc", "desc"):
             sort_dir = "desc"
         return jsonify(get_scraped_jobs(order_by=sort_col, order_dir=sort_dir))
@@ -94,20 +94,8 @@ def create_app():
         data = request.get_json()
         if not data or not data.get("external_id") or not data.get("role"):
             abort(400, "external_id and role required")
-        scraped = upsert_scraped_job(data)
-        auto_added = False
-        if data.get("auto_add") and not scraped.get("tracker_id"):
-            job = create_job({
-                "company": scraped["company"] or "Unknown",
-                "role": scraped["role"],
-                "url": scraped["url"],
-                "source": scraped["source"],
-                "status": "watchlist",
-                "notes": f"Auto-added by job finder (score: {scraped['score']})",
-            })
-            mark_scraped_added(scraped["external_id"], job["id"])
-            auto_added = True
-        return jsonify({"ok": True, "auto_added": auto_added}), 201
+        upsert_scraped_job(data)
+        return jsonify({"ok": True}), 201
 
     @app.route("/api/scraped/<external_id>/dismiss", methods=["POST"])
     def api_dismiss_scraped(external_id):
@@ -121,12 +109,11 @@ def create_app():
         jobs = get_scraped_jobs()
         buf = io.StringIO()
         writer = csv.DictWriter(buf, fieldnames=[
-            "score", "role", "company", "location", "source", "scraped_at", "url", "in_tracker"
+            "role", "company", "location", "source", "scraped_at", "url", "in_tracker"
         ])
         writer.writeheader()
         for job in jobs:
             writer.writerow({
-                "score": job["score"],
                 "role": job["role"],
                 "company": job["company"] or "",
                 "location": job["location"] or "",
@@ -270,7 +257,7 @@ def create_app():
             "url": scraped["url"],
             "source": scraped["source"],
             "status": "watchlist",
-            "notes": f"From job finder (score: {scraped['score']})",
+            "notes": "Added from job finder",
         })
         mark_scraped_added(external_id, job["id"])
         return jsonify({"ok": True, "tracker_id": job["id"]})

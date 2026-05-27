@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
 Job finder — fetches new job listings from LinkedIn and JSearch (RapidAPI),
-scores them against your configured keywords and location preferences, and sends
-top matches to Telegram. Runs via cron once daily.
+filters noise, and sends new listings to Telegram and email. Runs via cron once daily.
 """
 
 import json
@@ -21,14 +20,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from config import (
-    AUTO_ADD_THRESHOLD,
     BLOCKED_DOMAINS,
     BLOCKED_SOURCES,
-    KEYWORDS,
     LINKEDIN_LOCATION,
-    LOCATION_SCORES,
     MAX_JOBS_PER_NOTIFICATION,
-    MIN_KEYWORD_SCORE,
     SEARCH_QUERIES,
 )
 from db import init_db, is_seen, mark_seen
@@ -222,40 +217,10 @@ def is_blocked(job: dict) -> bool:
     return False
 
 
-# ── Scoring ───────────────────────────────────────────────────────────────────
-
-def score_job(job: dict) -> int:
-    """
-    Score 0–80: keyword relevance (0–60) + location preference (0–20).
-    """
-    text = f"{job['role']} {job['description']} {job['company']}".lower()
-    loc = f"{job['location']}".lower()
-
-    kw_score = 0
-    for kw, weight in KEYWORDS.items():
-        if kw.lower() in text:
-            kw_score += weight
-    kw_score = min(kw_score, 60)
-
-    # Location bonus only applies if the job is already keyword-relevant.
-    # Prevents location bonus from inflating scores for completely unrelated roles.
-    loc_score = 0
-    if kw_score >= MIN_KEYWORD_SCORE:
-        for place, weight in LOCATION_SCORES.items():
-            if place in loc:
-                loc_score = max(loc_score, weight)
-        if not loc_score and ("bc" in loc or "british columbia" in loc or "canada" in loc):
-            loc_score = 6
-
-    return kw_score + loc_score
-
-
 # ── Actions ───────────────────────────────────────────────────────────────────
 
-def ingest_to_tracker(job: dict, score: int) -> bool:
-    """Send a scraped job to the job tracker's Sources tab.
-    High-scoring jobs (score >= AUTO_ADD_THRESHOLD) are also auto-added to
-    the pipeline as Watchlist entries."""
+def ingest_to_tracker(job: dict) -> None:
+    """Send a scraped job to the job tracker's Sources tab."""
     try:
         data = json.dumps({
             "external_id": job["id"],
@@ -264,8 +229,6 @@ def ingest_to_tracker(job: dict, score: int) -> bool:
             "location": job.get("location", ""),
             "url": job["url"],
             "source": job["source"],
-            "score": score,
-            "auto_add": score >= AUTO_ADD_THRESHOLD,
         }).encode()
         req = urllib.request.Request(
             f"{JOB_TRACKER_URL}/api/scraped",
@@ -273,11 +236,9 @@ def ingest_to_tracker(job: dict, score: int) -> bool:
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        resp = json.loads(urllib.request.urlopen(req, timeout=5).read())
-        return resp.get("auto_added", False)
+        urllib.request.urlopen(req, timeout=5)
     except Exception as e:
         log.warning(f"Failed to ingest to tracker: {e}")
-        return False
 
 
 def send_telegram(text: str) -> None:
@@ -298,7 +259,7 @@ def send_telegram(text: str) -> None:
     urllib.request.urlopen(req, timeout=10)
 
 
-def send_email(scored_top: list, new_count: int, auto_added: int) -> None:
+def send_email(top: list, new_count: int) -> None:
     if not GMAIL_USER or not GMAIL_APP_PASSWORD or not EMAIL_RECIPIENTS:
         log.info("Email not configured or no recipients — skipping")
         return
@@ -308,23 +269,18 @@ def send_email(scored_top: list, new_count: int, auto_added: int) -> None:
 
     lines = [
         f"Job Digest — {now}",
-        f"{new_count} new listing{'s' if new_count != 1 else ''}, top {len(scored_top)} shown",
+        f"{new_count} new listing{'s' if new_count != 1 else ''}, top {len(top)} shown",
         "",
     ]
-    for job, score in scored_top:
-        icon = "🔥" if score >= 50 else "⭐" if score >= 30 else "📌"
+    for job in top:
         company = f" @ {job['company']}" if job["company"] else ""
         loc = f" · {job['location']}" if job["location"] else ""
-        lines.append(f"{icon} {job['role']}{company}{loc}  [score: {score}]")
+        lines.append(f"📌 {job['role']}{company}{loc}")
         lines.append(f"   {job['url']}")
         lines.append("")
 
-    if auto_added:
-        lines.append(f"✅ {auto_added} high-match job{'s' if auto_added != 1 else ''} auto-added to the tracker")
-        lines.append("")
-
     lines.append("—")
-    lines.append(f"Sent by Octo · Job Finder · {GMAIL_USER}")
+    lines.append(f"Job Finder · {GMAIL_USER}")
 
     body = "\n".join(lines)
     msg = MIMEText(body, "plain")
@@ -403,19 +359,11 @@ def main():
         log.info("Nothing new — exiting")
         return
 
-    scored = sorted(
-        [(j, score_job(j)) for j in new_jobs],
-        key=lambda x: x[1],
-        reverse=True,
-    )
-
-    added = 0
-    for job, score in scored:
+    for job in new_jobs:
         mark_seen(job["id"], job.get("url", ""))
-        if ingest_to_tracker(job, score):
-            added += 1
+        ingest_to_tracker(job)
 
-    top = scored[:MAX_JOBS_PER_NOTIFICATION]
+    top = new_jobs[:MAX_JOBS_PER_NOTIFICATION]
     now = datetime.now().strftime("%b %d, %I:%M %p")
     lines = [
         f"💼 *Job Digest — {now}*",
@@ -423,22 +371,15 @@ def main():
         f"top {len(top)} shown_\n",
     ]
 
-    for job, score in top:
-        icon = "🔥" if score >= 50 else "⭐" if score >= 30 else "📌"
+    for job in top:
         company = f" @ {job['company']}" if job["company"] else ""
         loc = f" · {job['location']}" if job["location"] else ""
-        lines.append(f"{icon} *{job['role']}*{company}{loc}")
+        lines.append(f"📌 *{job['role']}*{company}{loc}")
         lines.append(f"  [{job['source']}]({job['url']})\n")
 
-    if added:
-        lines.append(
-            f"_✅ {added} high-match job{'s' if added != 1 else ''} "
-            f"added to your tracker_"
-        )
-
     send_telegram("\n".join(lines))
-    send_email(scored, len(new_jobs), added)
-    log.info(f"Sent digest: {len(top)} shown, {added} auto-added to tracker")
+    send_email(top, len(new_jobs))
+    log.info(f"Sent digest: {len(top)} shown")
 
     # Log this run to tracker.db (best-effort — do not crash if table absent)
     import sqlite3 as _sqlite3
