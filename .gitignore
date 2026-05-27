@@ -15,3 +15,7 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# Local deployment tooling — personal paths, not for source control
+CLAUDE.md
+sync-to-live.sh
