@@ -5,6 +5,9 @@
 data/
 logs/
 
+# Personal scraper config — contains real location and queries, never push
+filters/scraper_config.json
+
 # Python
 venv/
 scraper/venv/
