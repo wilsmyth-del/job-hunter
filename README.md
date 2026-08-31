@@ -2,13 +2,15 @@
 
 Self-hostable job hunting toolkit. Scrapes listings, filters the noise, and tracks your pipeline.
 
+> **Status:** This original single-user toolkit is retained as a reference. Active hosted development moved to [job-hunter-portal](https://github.com/wilsmyth-del/job-hunter-portal).
+
 ---
 
 ## Quick Start
 
 **With Docker (recommended):**
 ```bash
-git clone <repo> job-hunter
+git clone https://github.com/wilsmyth-del/job-hunter.git
 cd job-hunter
 cp .env.example .env
 # Fill in your keys — see Environment Variables below
